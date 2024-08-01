@@ -17,7 +17,7 @@ class Kernel extends ConsoleKernel
     {
         //$schedule->command('inspire')->everyMinute();
         //$schedule->command('inspire')->everyFiveMinutes();
-        $schedule->command('command:sincronizarfacturas')->everyMinute()->sendOutputTo('task-output.log');
+        $schedule->command('command:sincronizarfacturas')->everyTenMinutes()->sendOutputTo('task-output.log');
 
     }
 

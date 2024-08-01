@@ -95,7 +95,7 @@ class sincronizarfacturasdian extends Command
         ->where('eliminar', 0)
         ->whereNull('dianestado_id')
         ->where('created', '>', now()->startOfDay())
-        ->take(200)
+        ->take(30)
         ->get();
 
     }
