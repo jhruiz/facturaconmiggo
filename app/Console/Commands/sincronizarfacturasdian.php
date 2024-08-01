@@ -51,7 +51,7 @@ class sincronizarfacturasdian extends Command
 
       // Obtienen las empresas configuradas para sincronizar facturas con la DIAN
       $empresas = $this->obtenerEmpresasConfiguradas();
-  
+
       foreach ($empresas as $empresa) {
           $this->procesarEmpresa($empresa);
       }
@@ -72,7 +72,7 @@ class sincronizarfacturasdian extends Command
       }
     }
 
-      //**//**//**//**//**//**//**//** INICIO CONSULTAS //**//**//**//**//**//**//**//**//**
+  //**//**//**//**//**//**//**//** INICIO CONSULTAS //**//**//**//**//**//**//**//**//**
 
     /**
      * Obtiene las empresas configuradas para gestión de facturación electrónica
@@ -96,7 +96,7 @@ class sincronizarfacturasdian extends Command
         ->where('dianestado_id', 1)
         // ->whereNull('dianestado_id')
         // ->where('created', '>', now()->startOfDay())
-        ->take(30)
+        ->take(200)
         ->get();
 
     }
@@ -304,6 +304,15 @@ class sincronizarfacturasdian extends Command
       'Authorization' => 'Bearer ' . $token
       ];
 
+  }
+
+  function validateArrays(...$arrays){
+      foreach ($arrays as $array) {
+          if (!is_array($array) || empty($array)) {
+              return false;
+          }
+      }
+      return true;
   }
   
 
@@ -527,24 +536,31 @@ class sincronizarfacturasdian extends Command
 
         //Organiza la información de la resolución
         $infoRes = $this->generarInfoResolucion( $infoResolucion, $val, $typeDocument );
-
+        
         //Obtiene la información del cliente de la factura
         $infoCliente = $this->generarInfoCliente( $val['cliente_id'], $municipio_id );
-
+        
         //Obtiene la información del tipo de pago
         $infoTipoPago = $this->generarInfoTipoPago( $val['id'] );
-
+        
         //Obtiene los totales generales de la factura
         $infoPagoGeneral = $this->generarInfoPagoGeneral( $val['id'] );
 
-        $jsonFactura = json_encode( array_merge( $infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral ) );
-
-        $resp = $this->sincronizarDian( $jsonFactura, $token, $val['id'] );
+        //Valida que todos los resultados sean un array procesable
+        if ($this->validateArrays($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral)) {
+          $jsonFactura = json_encode(array_merge($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral));
+          $resp = $this->sincronizarDian( $jsonFactura, $token, $val['id'] );
+        } else {
+          // Actualiza el estado de la factura
+          $this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_ERROR') );
+          $this->actualizarMensajeFactura( $val['id'] , config('custom.MENSAJE_ERROR'));
+        }
 
       }
 
     }
 
   //**//**//**//**//**//**//**//** FIN GENERACION FACTURAS //**//**//**//**//**//**//**//**//**
+
 
 }
