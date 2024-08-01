@@ -93,9 +93,8 @@ class sincronizarfacturasdian extends Command
       return Factura::where('empresa_id', $empresaId)
         ->where('factura', 1)
         ->where('eliminar', 0)
-        ->where('dianestado_id', 1)
-        // ->whereNull('dianestado_id')
-        // ->where('created', '>', now()->startOfDay())
+        ->whereNull('dianestado_id')
+        ->where('created', '>', now()->startOfDay())
         ->take(200)
         ->get();
 
