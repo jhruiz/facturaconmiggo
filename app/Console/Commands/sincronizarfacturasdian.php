@@ -68,7 +68,7 @@ class sincronizarfacturasdian extends Command
       // Valida que la empresa tenga configurada la información de la resolución
       if (isset($infoResolucion['id'])) {
           // Llama a función general que genera todos los llamados para la creación de la factura para la DIAN
-          $this->generarFacturasDian($infoResolucion, $empresa['tokendian'], $empresa['typedocument'], $empresa['municipio_id']);
+          $this->generarFacturasDian($infoResolucion, $empresa['tokendian'], $empresa['typedocument'], $empresa['municipio_id'], $empresa['nit']);
       }
     }
 
@@ -478,7 +478,7 @@ class sincronizarfacturasdian extends Command
       $headers = $this->obtenerCabeceras($token);
   
       try {
-          $response = $client->request('POST', config('custom.API_DIAN') . 'invoice', [
+          $response = $client->request('POST', config('custom.API_DIAN') . 'ubl2.1/invoice', [
               'body' => $body,
               'headers' => $headers
           ]);
@@ -513,11 +513,32 @@ class sincronizarfacturasdian extends Command
         
     }
 
+    /**
+     * Envía el correo de la factura al cliente
+     */
+    private function enviarCorreoFactura( $nitEmpresa, $prefijo, $consecutivodian, $token ) {
+      
+      $client = new Client();
+      $headers = $this->obtenerCabeceras($token);
+      
+      $body = array(
+        'company_idnumber' => $this->obtenerIdentificacion( $nitEmpresa ),
+        'prefix' => $prefijo,
+        'number' => $consecutivodian
+      );
+
+      $response = $client->request('POST', config('custom.API_DIAN') . 'send-email-customer', [
+        'body' => json_encode($body),
+        'headers' => $headers
+      ]);
+
+    }
+
 
     /**
      * Genera la información necesaria para enviar las facturas a la Dian
      */
-    public function generarFacturasDian( $infoResolucion, $token, $typeDocument, $municipio_id ) {
+    public function generarFacturasDian( $infoResolucion, $token, $typeDocument, $municipio_id, $nitEmpresa ) {
       
       //Se obtiene la información de las facturas
       $facturas = $this->obtenerFacturas( $infoResolucion['empresa_id'] );
@@ -549,6 +570,9 @@ class sincronizarfacturasdian extends Command
         if ($this->validateArrays($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral)) {
           $jsonFactura = json_encode(array_merge($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral));
           $resp = $this->sincronizarDian( $jsonFactura, $token, $val['id'] );
+
+          //Realiza el envío del correo
+          $this->enviarCorreoFactura( $nitEmpresa, $infoResolucion['prefijo'], $val['consecutivodian'], $token );
         } else {
           // Actualiza el estado de la factura
           $this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_ERROR') );

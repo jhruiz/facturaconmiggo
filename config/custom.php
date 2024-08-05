@@ -18,7 +18,7 @@ return [
     'ALLOWANCE_CHARGES_REASON' => env('ALLOWANCE_CHARGES_REASON', "Descuento General"),
     'UNIT_MEASURE' => env('UNIT_MEASURE', 70),
     'SYNC_DIAN' => env('SYNC_DIAN', 1),
-    'API_DIAN' => env('API_DIAN', "https://facturaconmiggo.com/api/ubl2.1/"),
+    'API_DIAN' => env('API_DIAN', "https://facturaconmiggo.com/api/"),
     'DURATION_MEASURE' => env('DURATION_MEASURE', 30),
     'DIAN_ESTADO_ERROR' => env('DIAN_ESTADO_ERROR', 3),
     'DIAN_ESTADO_PROCESANDO' => env('DIAN_ESTADO_PROCESANDO', 4),
