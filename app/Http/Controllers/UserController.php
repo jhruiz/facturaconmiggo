@@ -458,6 +458,27 @@ class UserController extends Controller
         
     }
 
+    /**
+     * Envía el correo de la factura al cliente
+     */
+    private function enviarCorreoFactura( $nitEmpresa, $prefijo, $consecutivodian, $token ) {
+      
+      $client = new Client();
+      $headers = $this->obtenerCabeceras($token);
+      
+      $body = array(
+        'company_idnumber' => $this->obtenerIdentificacion( $nitEmpresa ),
+        'prefix' => $prefijo,
+        'number' => $consecutivodian
+      );
+
+      $response = $client->request('POST', config('custom.API_DIAN') . 'send-email-customer', [
+        'body' => json_encode($body),
+        'headers' => $headers
+      ]);
+
+    }
+
 
     /**
      * Genera la información necesaria para enviar las facturas a la Dian
@@ -494,6 +515,9 @@ class UserController extends Controller
         if ($this->validateArrays($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral)) {
           $jsonFactura = json_encode(array_merge($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral));
           $resp = $this->sincronizarDian( $jsonFactura, $token, $val['id'] );
+
+          //Realiza el envío del correo
+          $this->enviarCorreoFactura( $nitEmpresa, $infoResolucion['prefijo'], $val['consecutivodian'], $token );
         } else {
           // Actualiza el estado de la factura
           $this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_ERROR') );
