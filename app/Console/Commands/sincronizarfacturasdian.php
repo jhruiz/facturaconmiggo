@@ -178,9 +178,9 @@ class sincronizarfacturasdian extends Command
   public function obtenerIdentificacion( $identificacion ) {
     if (strpos($identificacion, '-') !== false) {
       $identificacion = explode('-', $identificacion);
-      return $identificacion['0'];
+      return str_replace(" ", "", $identificacion['0']);
     } else {
-        return $identificacion;
+        return str_replace(" ", "", $identificacion);
     } 
   }
 
