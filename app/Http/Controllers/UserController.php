@@ -37,10 +37,9 @@ class UserController extends Controller
       return Factura::where('empresa_id', $empresaId)
         ->where('factura', 1)
         ->where('eliminar', 0)
-        ->where('id', 270546)
-        //->where('dianestado_id', 1)
+        ->where('dianestado_id', 3)
         // ->whereNull('dianestado_id')
-        // ->where('created', '>', now()->startOfDay())
+        ->where('created', '>', now()->startOfDay())
         ->take(200)
         ->get();
 
@@ -124,9 +123,9 @@ class UserController extends Controller
   public function obtenerIdentificacion( $identificacion ) {
     if (strpos($identificacion, '-') !== false) {
       $identificacion = explode('-', $identificacion);
-      return $identificacion['0'];
+      return str_replace(" ", "", $identificacion['0']);
     } else {
-        return $identificacion;
+        return str_replace(" ", "", $identificacion);
     } 
   }
 
@@ -515,10 +514,10 @@ class UserController extends Controller
         //Valida que todos los resultados sean un array procesable
         if ($this->validateArrays($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral)) {
           $jsonFactura = json_encode(array_merge($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral));
-          //$resp = $this->sincronizarDian( $jsonFactura, $token, $val['id'] );
+          $resp = $this->sincronizarDian( $jsonFactura, $token, $val['id'] );
 
           //Realiza el envío del correo
-          $this->enviarCorreoFactura( $nitEmpresa, $infoResolucion['prefijo'], $val['consecutivodian'], $token );
+          //$this->enviarCorreoFactura( $nitEmpresa, $infoResolucion['prefijo'], $val['consecutivodian'], $token );
         } else {
           // Actualiza el estado de la factura
           $this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_ERROR') );
