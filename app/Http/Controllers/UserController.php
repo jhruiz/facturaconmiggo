@@ -21,26 +21,26 @@ class UserController extends Controller
     /**
      * Obtiene las empresas configuradas para gestión de facturación electrónica
      */
-    public function obtenerEmpresasConfiguradas(){
+    public function obtenerEmpresasConfiguradas( $conn ){
 
       $syncDian = config('custom.SYNC_DIAN');
 
-      return Empresa::where('syncdian', $syncDian)->get();
+      return (new Empresa)->setConnection($conn)->where('syncdian', $syncDian)->get();
 
     }
 
     /**
      * Obtiene la información de las facturas que se van enviar hacia la Dian
      */
-    public function obtenerFacturas( $empresaId ) {
+    public function obtenerFacturas( $empresaId, $conn ) {
 
-      return Factura::where('empresa_id', $empresaId)
+      return (new Factura)->setConnection($conn)->where('empresa_id', $empresaId)
         ->where('factura', 1)
         ->where('eliminar', 0)
-        ->where('dianestado_id', 3)
+        ->where('dianestado_id', 6)
         // ->whereNull('dianestado_id')
-        ->where('created', '>', now()->startOfDay())
-        ->take(200)
+        //->where('created', '>', now()->startOfDay())
+        ->take(10)
         ->get();
 
     }
@@ -48,9 +48,9 @@ class UserController extends Controller
     /**
      * Obtiene la información de la resolución
      */
-    public function obtenerInfoResolucion( $empresaId ) {
+    public function obtenerInfoResolucion( $empresaId, $conn ) {
 
-      return Deposito::where('empresa_id', $empresaId)
+      return (new Deposito)->setConnection($conn)->where('empresa_id', $empresaId)
                           ->where('resolucionfacturacion', '<>', '')
                           ->first();
 
@@ -59,36 +59,36 @@ class UserController extends Controller
     /**
      * Obtiene la información del cliente de la factura
      */
-    public function obtenerInfoCliente( $clienteId ) {
+    public function obtenerInfoCliente( $clienteId, $conn ) {
       
-      return Cliente::where('id', $clienteId)->get();
+      return (new Cliente)->setConnection($conn)->where('id', $clienteId)->get();
 
     }
 
     /**
      * Obtiene la información del tipo de pago débito
      */
-    public function obtenerInfoTipoPagoEfectivo( $facturaId ) {
+    public function obtenerInfoTipoPagoEfectivo( $facturaId, $conn ) {
 
-      return FacturaCuentaValore::where('factura_id', $facturaId)->get();
+      return (new FacturaCuentaValore)->setConnection($conn)->where('factura_id', $facturaId)->get();
 
     }
 
     /**
      * Obtiene la información del tipo de pago a crédito
      */
-    public function obtenerInfoTipoPagoCredito( $facturaId ) {
+    public function obtenerInfoTipoPagoCredito( $facturaId, $conn ) {
 
-      return Cuentascliente::where('factura_id', $facturaId)->get();
+      return (new Cuentascliente)->setConnection($conn)->where('factura_id', $facturaId)->get();
 
     }
 
     /**
      * Obtiene la información del detalle de la factura
      */
-    public function obtenerInfoFacturaDetalles( $facturaId ) {
+    public function obtenerInfoFacturaDetalles( $facturaId, $conn ) {
 
-      return Facturasdetalle::where('facturasdetalles.factura_id', $facturaId)
+      return (new Facturasdetalle)->setConnection($conn)->where('facturasdetalles.factura_id', $facturaId)
                               ->join('productos', 'productos.id', '=' ,'facturasdetalles.producto_id')
                               ->get();
     }
@@ -96,9 +96,9 @@ class UserController extends Controller
     /**
      * Actualiza el estado de la factura a procesando, sincronizada o error
      */
-    private function actualizarEstadoFactura( $factura_id, $estado_id ) {
+    private function actualizarEstadoFactura( $factura_id, $estado_id, $conn ) {
 
-      Factura::where('id', $factura_id)
+      (new Factura)->setConnection($conn)->where('id', $factura_id)
       ->update(['dianestado_id' => $estado_id]);
 
     }
@@ -106,9 +106,9 @@ class UserController extends Controller
     /**
      * Actualiza el mensaje de error en la factura
      */
-    private function actualizarMensajeFactura( $factura_id,  $mensaje ) {
+    private function actualizarMensajeFactura( $factura_id,  $mensaje, $conn ) {
 
-      Factura::where('id', $factura_id)
+      (new Factura)->setConnection($conn)->where('id', $factura_id)
       ->update(['mensajedian' => $mensaje]);
     
     }
@@ -116,6 +116,17 @@ class UserController extends Controller
   //**//**//**//**//**//**//**//** FIN CONSULTAS //**//**//**//**//**//**//**//**//**
 
   //**//**//**//**//**//**//**//** INICIO FUNCIONES APOYO //**//**//**//**//**//**//**//**//**
+
+  /**
+   * Se crea y retorna un arreglo con todas las conexiones configuradas
+   */
+  private function obtenerConexiones() {
+
+    return array(
+      'mysql_pymes'
+    );
+
+  }
 
   /**
    * Obtiene el número de identificación del cliente
@@ -287,9 +298,9 @@ class UserController extends Controller
     /**
      * Genera la información del cliente de la factura
      */
-    public function generarInfoCliente($cliente_id, $municipio_id) {
+    public function generarInfoCliente( $cliente_id, $municipio_id, $conn ) {
 
-      $infoCliente = $this->obtenerInfoCliente($cliente_id);
+      $infoCliente = $this->obtenerInfoCliente( $cliente_id, $conn );
 
       if ( !isset( $infoCliente['0'] ) ) { 
           return $this->formatearInfoCliente([
@@ -330,9 +341,9 @@ class UserController extends Controller
     /**
      * Genera la información del tipo de pago de la factura
      */
-    public function generarInfoTipoPago( $facturaId ) {
+    public function generarInfoTipoPago( $facturaId, $conn ) {
 
-      $infoTipoPago = $this->obtenerInfoTipoPagoEfectivo( $facturaId );
+      $infoTipoPago = $this->obtenerInfoTipoPagoEfectivo( $facturaId, $conn );
 
       if( isset( $infoTipoPago['0'] ) ){
 
@@ -345,7 +356,7 @@ class UserController extends Controller
 
       } else {
         
-        $infoTipoPago = $this->obtenerInfoTipoPagoCredito( $facturaId );
+        $infoTipoPago = $this->obtenerInfoTipoPagoCredito( $facturaId, $conn );
         
         if( isset( $infoTipoPago['0'] ) ) {
 
@@ -374,9 +385,9 @@ class UserController extends Controller
     /**
      * Genera la información general de la factura
      */
-    public function generarInfoPagoGeneral( $facturaId ) {
+    public function generarInfoPagoGeneral( $facturaId, $conn ) {
 
-      $infoFacturaDetalle = $this->obtenerInfoFacturaDetalles( $facturaId );
+      $infoFacturaDetalle = $this->obtenerInfoFacturaDetalles( $facturaId, $conn );
 
       if ( !isset( $infoFacturaDetalle['0'] ) ) {
         return false;
@@ -417,7 +428,7 @@ class UserController extends Controller
     /**
      * Consumir el servicio de facturación de la DIAN
      */
-    private function sincronizarDian( $body, $token, $factura_id ) {
+    private function sincronizarDian( $body, $token, $factura_id, $conn ) {
 
       $client = new Client();
       $headers = $this->obtenerCabeceras($token);
@@ -436,24 +447,24 @@ class UserController extends Controller
   
               $mensaje = $resp->ResponseDian->Envelope->Body->SendBillSyncResponse->SendBillSyncResult->ErrorMessage->string;
   
-              $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_ERROR'));
-              $this->actualizarMensajeFactura($factura_id, $mensaje);
+              $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_ERROR'), $conn);
+              $this->actualizarMensajeFactura($factura_id, $mensaje, $conn);
               return;
           }
   
-          $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_SINCRONIZADA'));
+          $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_SINCRONIZADA'), $conn);
       } catch (RequestException $e) {
           // Maneja errores de solicitudes HTTP
-          $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_ERROR'));
-          $this->actualizarMensajeFactura($factura_id, $e->getMessage());
+          $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_ERROR'), $conn);
+          $this->actualizarMensajeFactura($factura_id, $e->getMessage(), $conn);
       } catch (GuzzleException $e) {
           // Maneja otros errores de Guzzle
-          $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_ERROR'));
-          $this->actualizarMensajeFactura($factura_id, $e->getMessage());
+          $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_ERROR'), $conn);
+          $this->actualizarMensajeFactura($factura_id, $e->getMessage(), $conn);
       } catch (\Exception $e) {
           // Maneja cualquier otro tipo de excepción
-          $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_ERROR'));
-          $this->actualizarMensajeFactura($factura_id, $e->getMessage());
+          $this->actualizarEstadoFactura($factura_id, config('custom.DIAN_ESTADO_ERROR'), $conn);
+          $this->actualizarMensajeFactura($factura_id, $e->getMessage(), $conn);
       }
         
     }
@@ -483,10 +494,10 @@ class UserController extends Controller
     /**
      * Genera la información necesaria para enviar las facturas a la Dian
      */
-    public function generarFacturasDian( $infoResolucion, $token, $typeDocument, $municipio_id, $nitEmpresa ) {
+    public function generarFacturasDian( $infoResolucion, $token, $typeDocument, $municipio_id, $nitEmpresa, $conn ) {
       
       //Se obtiene la información de las facturas
-      $facturas = $this->obtenerFacturas( $infoResolucion['empresa_id'] );
+      $facturas = $this->obtenerFacturas( $infoResolucion['empresa_id'], $conn );
 
       if( !isset( $facturas['0'] ) ) {
         return false;
@@ -497,31 +508,31 @@ class UserController extends Controller
       foreach( $facturas as $val ) {
 
         //Actualiza el estado de la factura
-        $this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_PROCESANDO') );
+        $this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_PROCESANDO'), $conn );
 
         //Organiza la información de la resolución
         $infoRes = $this->generarInfoResolucion( $infoResolucion, $val, $typeDocument );
         
         //Obtiene la información del cliente de la factura
-        $infoCliente = $this->generarInfoCliente( $val['cliente_id'], $municipio_id );
+        $infoCliente = $this->generarInfoCliente( $val['cliente_id'], $municipio_id, $conn );
         
         //Obtiene la información del tipo de pago
-        $infoTipoPago = $this->generarInfoTipoPago( $val['id'] );
+        $infoTipoPago = $this->generarInfoTipoPago( $val['id'], $conn );
         
         //Obtiene los totales generales de la factura
-        $infoPagoGeneral = $this->generarInfoPagoGeneral( $val['id'] );
+        $infoPagoGeneral = $this->generarInfoPagoGeneral( $val['id'], $conn );
 
         //Valida que todos los resultados sean un array procesable
         if ($this->validateArrays($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral)) {
           $jsonFactura = json_encode(array_merge($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral));
-          $resp = $this->sincronizarDian( $jsonFactura, $token, $val['id'] );
+          //$resp = $this->sincronizarDian( $jsonFactura, $token, $val['id'], $conn );
 
           //Realiza el envío del correo
           //$this->enviarCorreoFactura( $nitEmpresa, $infoResolucion['prefijo'], $val['consecutivodian'], $token );
         } else {
           // Actualiza el estado de la factura
-          $this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_ERROR') );
-          $this->actualizarMensajeFactura( $val['id'] , config('custom.MENSAJE_ERROR'));
+          $this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_ERROR'), $conn );
+          $this->actualizarMensajeFactura( $val['id'] , config('custom.MENSAJE_ERROR'), $conn );
         }
 
       }
@@ -536,24 +547,33 @@ class UserController extends Controller
 
     //función principal que actuará como el handle
   public function main() {
-      // Obtienen las empresas configuradas para sincronizar facturas con la DIAN
-      $empresas = $this->obtenerEmpresasConfiguradas();
 
-      foreach ($empresas as $empresa) {
-          $this->procesarEmpresa($empresa);
-      }
+      // Obtiene las conexiones configuradas para el multi tenant
+      $multiTenantConnection = $this->obtenerConexiones();
+
+      foreach( $multiTenantConnection as $conn ) {
+
+        // Obtienen las empresas configuradas para sincronizar facturas con la DIAN
+        $empresas = $this->obtenerEmpresasConfiguradas( $conn );
+
+        foreach ($empresas as $empresa) {
+            $this->procesarEmpresa($empresa, $conn );
+        }
+      } 
+
   }
   
-    private function procesarEmpresa($empresa) {
+    private function procesarEmpresa($empresa, $conn) {
         // Obtiene la información de la resolución de la empresa
-        $infoResolucion = $this->obtenerInfoResolucion($empresa['id']);
+        $infoResolucion = $this->obtenerInfoResolucion($empresa['id'], $conn);
     
         // Valida que la empresa tenga configurada la información de la resolución
         if (isset($infoResolucion['id'])) {
             // Llama a función general que genera todos los llamados para la creación de la factura para la DIAN
-            $this->generarFacturasDian($infoResolucion, $empresa['tokendian'], $empresa['typedocument'], $empresa['municipio_id'], $empresa['nit']);
+            $this->generarFacturasDian($infoResolucion, $empresa['tokendian'], $empresa['typedocument'], $empresa['municipio_id'], $empresa['nit'], $conn);
         }
     }
 
     //**//**//**//**//**//**//**//** FIN FUNCION PRINCIPAL //**//**//**//**//**//**//**//**//**
+
 }
