@@ -184,7 +184,9 @@ class sincronizarfacturasdian extends Command
   private function obtenerConexiones() {
 
     return array(
-      'mysql_pymes'
+      'mysql_pymes',
+      'mysql_ssmedellin',
+      'mysql_ssbogota'
     );
 
   }
