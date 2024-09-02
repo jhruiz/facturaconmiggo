@@ -252,10 +252,10 @@ class sincronizarfacturasdian extends Command
   public function obtenerTotalesVenta( $sumValSinIva, $sumValConIva ) {
 
     return [
-      'line_extension_amount' => round( $sumValSinIva, 2),
-      'tax_exclusive_amount' => round( $sumValSinIva, 2),
-      'tax_inclusive_amount' => round( $sumValConIva, 2),
-      'payable_amount' => round( $sumValConIva, 2)
+    'line_extension_amount' => number_format(round($sumValSinIva, 2), 2, '.', ''),
+    'tax_exclusive_amount' => number_format(round($sumValSinIva, 2), 2, '.', ''),
+    'tax_inclusive_amount' => number_format(round($sumValConIva, 2), 2, '.', ''),
+    'payable_amount' => number_format(round($sumValConIva, 2), 2, '.', '')
     ];
   }
 
@@ -387,21 +387,69 @@ class sincronizarfacturasdian extends Command
    * a la factura en la base de datos
    */
   private function formatearInfoCliente($infoCliente, $municipio_id) {
-    return [
-      "customer" => [
-        "identification_number" => !empty($infoCliente['nit']) ? $this->obtenerIdentificacion($infoCliente['nit']) : '1234567890',
-        "name" => !empty($infoCliente['nombre']) ? $infoCliente['nombre'] : 'Cliente anónimo',
-        "phone" => !empty($infoCliente['celular']) ? $infoCliente['celular'] : '3101234567',
-        "address" => !empty($infoCliente['direccion']) ? $infoCliente['direccion'] : 'Calle 1 # 2 - 3',
-        "email" => !empty($infoCliente['email']) ? $infoCliente['email'] : 'noemail@hotmail.comm',
-        "merchant_registration" => config('custom.MERCHANT_REGISTRATION'),
-        "type_document_identification_id" => $infoCliente['tipoidentificacione_id'],
-        "type_organization_id" => $this->obtenerOrganizacion($infoCliente['tipoidentificacione_id']),
-        "municipality_id" => $municipio_id,
-        "type_regime_id" => $this->obtenerOrganizacion($infoCliente['tipoidentificacione_id'])
-      ]
-    ];
-}
+  
+        $typeRegimen = $this->obtenerOrganizacion($infoCliente['tipoidentificacione_id']);
+        
+        // Manejar el caso en que el cliente es una organización (tipoRegimen = 1)
+        $identification = !empty($infoCliente['nit']) ? $this->obtenerIdentificacion($infoCliente['nit']) : '1234567890';
+        $dv = $typeRegimen == '1' ? $this->calcularDigitoVerificacion($identification) : null;
+        
+        // Definir un array de cliente con valores por defecto
+        $cliente = [
+            "identification_number" => $identification,
+            "dv" => $dv,
+            "name" => !empty($infoCliente['nombre']) ? $infoCliente['nombre'] : 'Cliente anónimo',
+            "phone" => !empty($infoCliente['celular']) ? $infoCliente['celular'] : '3101234567',
+            "address" => !empty($infoCliente['direccion']) ? $infoCliente['direccion'] : 'Calle 1 # 2 - 3',
+            "email" => !empty($infoCliente['email']) ? $infoCliente['email'] : 'noemail@hotmail.com',
+            "merchant_registration" => config('custom.MERCHANT_REGISTRATION'),
+            "type_document_identification_id" => $infoCliente['tipoidentificacione_id'],
+            "type_organization_id" => $typeRegimen,
+            "municipality_id" => $municipio_id,
+            "type_regime_id" => $typeRegimen
+        ];
+    
+        // Si el cliente no es una organización, removemos el campo 'dv'
+        if ($typeRegimen != '1') {
+            unset($cliente['dv']);
+        }
+    
+        return ['customer' => $cliente];
+
+  }
+    
+  /**
+   * Calcula el digito de verificacion de un nit 
+   */
+  private function calcularDigitoVerificacion($nit)  {
+
+        // Factores predefinidos para la multiplicación
+        $factors = [3, 7, 13, 17, 19, 23, 29, 37, 41];
+        
+        // Convertir el NIT en una cadena y asegurarse de que sea solo dígitos
+        $nit = (string) preg_replace('/\D/', '', $nit);
+
+        // Inicializar la suma
+        $sum = 0;
+        
+        // Longitud del NIT
+        $length = strlen($nit);
+
+        // Recorrer cada dígito del NIT, multiplicarlo por el factor correspondiente y sumarlo
+        for ($i = 0; $i < $length; $i++) {
+            $sum += $nit[$i] * $factors[$length - $i - 1];
+        }
+
+        // Obtener el residuo de la división de la suma por 11
+        $remainder = $sum % 11;
+
+        // Determinar el dígito de verificación
+        if ($remainder == 0 || $remainder == 1) {
+            return 0;
+        } else {
+            return 11 - $remainder;
+        }
+  }
 
 
     /**

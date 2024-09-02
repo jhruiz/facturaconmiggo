@@ -25,7 +25,7 @@ class UserController extends Controller
 
       $syncDian = config('custom.SYNC_DIAN');
 
-      return (new Empresa)->setConnection($conn)->where('syncdian', $syncDian)->get();
+      return (new Empresa)->setConnection($conn)->where('syncdian', $syncDian)->where('id', 161)->get();
 
     }
 
@@ -37,7 +37,8 @@ class UserController extends Controller
       return (new Factura)->setConnection($conn)->where('empresa_id', $empresaId)
         ->where('factura', 1)
         ->where('eliminar', 0)
-        ->where('dianestado_id', 6)
+        ->where('id', 281240)
+        //->where('dianestado_id', 6)
         // ->whereNull('dianestado_id')
         //->where('created', '>', now()->startOfDay())
         ->take(10)
@@ -134,6 +135,7 @@ class UserController extends Controller
    * Obtiene el número de identificación del cliente
    */
   public function obtenerIdentificacion( $identificacion ) {
+  
     if (strpos($identificacion, '-') !== false) {
       $identificacion = explode('-', $identificacion);
       return str_replace(" ", "", $identificacion['0']);
@@ -191,10 +193,10 @@ class UserController extends Controller
   public function obtenerTotalesVenta( $sumValSinIva, $sumValConIva ) {
 
     return [
-      'line_extension_amount' => round( $sumValSinIva, 2),
-      'tax_exclusive_amount' => round( $sumValSinIva, 2),
-      'tax_inclusive_amount' => round( $sumValConIva, 2),
-      'payable_amount' => round( $sumValConIva, 2)
+    'line_extension_amount' => number_format(round($sumValSinIva, 2), 2, '.', ''),
+    'tax_exclusive_amount' => number_format(round($sumValSinIva, 2), 2, '.', ''),
+    'tax_inclusive_amount' => number_format(round($sumValConIva, 2), 2, '.', ''),
+    'payable_amount' => number_format(round($sumValConIva, 2), 2, '.', '')
     ];
   }
 
@@ -323,20 +325,68 @@ class UserController extends Controller
    * a la factura en la base de datos
    */
   private function formatearInfoCliente($infoCliente, $municipio_id) {
-      return [
-        "customer" => [
-          "identification_number" => !empty($infoCliente['nit']) ? $this->obtenerIdentificacion($infoCliente['nit']) : '1234567890',
-          "name" => !empty($infoCliente['nombre']) ? $infoCliente['nombre'] : 'Cliente anónimo',
-          "phone" => !empty($infoCliente['celular']) ? $infoCliente['celular'] : '3101234567',
-          "address" => !empty($infoCliente['direccion']) ? $infoCliente['direccion'] : 'Calle 1 # 2 - 3',
-          "email" => !empty($infoCliente['email']) ? $infoCliente['email'] : 'noemail@hotmail.comm',
-          "merchant_registration" => config('custom.MERCHANT_REGISTRATION'),
-          "type_document_identification_id" => $infoCliente['tipoidentificacione_id'],
-          "type_organization_id" => $this->obtenerOrganizacion($infoCliente['tipoidentificacione_id']),
-          "municipality_id" => $municipio_id,
-          "type_regime_id" => $this->obtenerOrganizacion($infoCliente['tipoidentificacione_id'])
-        ]
-      ];
+  
+        $typeRegimen = $this->obtenerOrganizacion($infoCliente['tipoidentificacione_id']);
+        
+        // Manejar el caso en que el cliente es una organización (tipoRegimen = 1)
+        $identification = !empty($infoCliente['nit']) ? $this->obtenerIdentificacion($infoCliente['nit']) : '1234567890';
+        $dv = $typeRegimen == '1' ? $this->calcularDigitoVerificacion($identification) : null;
+        
+        // Definir un array de cliente con valores por defecto
+        $cliente = [
+            "identification_number" => $identification,
+            "dv" => $dv,
+            "name" => !empty($infoCliente['nombre']) ? $infoCliente['nombre'] : 'Cliente anónimo',
+            "phone" => !empty($infoCliente['celular']) ? $infoCliente['celular'] : '3101234567',
+            "address" => !empty($infoCliente['direccion']) ? $infoCliente['direccion'] : 'Calle 1 # 2 - 3',
+            "email" => !empty($infoCliente['email']) ? $infoCliente['email'] : 'noemail@hotmail.com',
+            "merchant_registration" => config('custom.MERCHANT_REGISTRATION'),
+            "type_document_identification_id" => $infoCliente['tipoidentificacione_id'],
+            "type_organization_id" => $typeRegimen,
+            "municipality_id" => $municipio_id,
+            "type_regime_id" => $typeRegimen
+        ];
+    
+        // Si el cliente no es una organización, removemos el campo 'dv'
+        if ($typeRegimen != '1') {
+            unset($cliente['dv']);
+        }
+    
+        return ['customer' => $cliente];
+
+  }
+  
+  /**
+   * Calcula el digito de verificacion de un nit 
+   */
+  private function calcularDigitoVerificacion($nit)  {
+
+        // Factores predefinidos para la multiplicación
+        $factors = [3, 7, 13, 17, 19, 23, 29, 37, 41];
+        
+        // Convertir el NIT en una cadena y asegurarse de que sea solo dígitos
+        $nit = (string) preg_replace('/\D/', '', $nit);
+
+        // Inicializar la suma
+        $sum = 0;
+        
+        // Longitud del NIT
+        $length = strlen($nit);
+
+        // Recorrer cada dígito del NIT, multiplicarlo por el factor correspondiente y sumarlo
+        for ($i = 0; $i < $length; $i++) {
+            $sum += $nit[$i] * $factors[$length - $i - 1];
+        }
+
+        // Obtener el residuo de la división de la suma por 11
+        $remainder = $sum % 11;
+
+        // Determinar el dígito de verificación
+        if ($remainder == 0 || $remainder == 1) {
+            return 0;
+        } else {
+            return 11 - $remainder;
+        }
   }
 
 
@@ -510,14 +560,15 @@ class UserController extends Controller
       foreach( $facturas as $val ) {
 
         //Actualiza el estado de la factura
-        $this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_PROCESANDO'), $conn );
+        //$this->actualizarEstadoFactura( $val['id'], config('custom.DIAN_ESTADO_PROCESANDO'), $conn );
 
         //Organiza la información de la resolución
         $infoRes = $this->generarInfoResolucion( $infoResolucion, $val, $typeDocument );
         
         //Obtiene la información del cliente de la factura
         $infoCliente = $this->generarInfoCliente( $val['cliente_id'], $municipio_id, $conn );
-        
+        print_r($infoCliente); die();
+
         //Obtiene la información del tipo de pago
         $infoTipoPago = $this->generarInfoTipoPago( $val['id'], $conn );
         
@@ -527,6 +578,8 @@ class UserController extends Controller
         //Valida que todos los resultados sean un array procesable
         if ($this->validateArrays($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral)) {
           $jsonFactura = json_encode(array_merge($infoRes, $infoCliente, $infoTipoPago, $prevBalance, $infoPagoGeneral));
+          print_r($jsonFactura); die();
+
           //$resp = $this->sincronizarDian( $jsonFactura, $token, $val['id'], $conn );
 
           //Realiza el envío del correo
